@@ -41,7 +41,10 @@
     main { max-width: 1600px; margin: 0 auto; padding: 1.5rem; }
 
     .stat-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 1.25rem; }
-    .stat { background: var(--bg2); border: 0.5px solid var(--border); border-radius: var(--radius-lg); padding: 1rem 1.125rem; }
+    .stat { background: var(--bg2); border: 0.5px solid var(--border); border-radius: var(--radius-lg); padding: 1rem 1.125rem; transition: border-color 0.15s, background 0.15s; }
+    .stat.clickable { cursor: pointer; }
+    .stat.clickable:hover { background: var(--bg3); border-color: var(--border2); }
+    .stat.clickable.active { border-color: rgba(34,201,138,0.35); background: var(--green-bg); }
     .stat .label { font-size: 10px; color: var(--text3); font-family: var(--mono); letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 5px; }
     .stat .val { font-size: 20px; font-weight: 500; font-family: var(--mono); }
     .stat .val.green { color: var(--green); }
@@ -156,7 +159,7 @@
       <div class="logo-icon"><i class="ti ti-wave-sine" aria-hidden="true"></i></div>
       <div>
         <div class="logo-text">CRYPTO <span>FIB</span> SCANNER</div>
-        <div class="logo-sub">ATH → ATL · 8 FIB LEVELS · TOP 200 MCAP</div>
+        <div class="logo-sub" id="logo-sub">ATH → ATL · 8 FIB LEVELS · TOP 200 MCAP</div>
       </div>
     </div>
     <div class="header-right">
@@ -169,11 +172,11 @@
 
   <main>
     <div class="stat-row">
-      <div class="stat"><div class="label">coins scanned</div><div class="val" id="s-total">—</div></div>
-      <div class="stat"><div class="label">near any fib</div><div class="val green" id="s-near">—</div></div>
-      <div class="stat"><div class="label">near 0.618 golden</div><div class="val amber" id="s-618">—</div></div>
-      <div class="stat"><div class="label">near 0.118</div><div class="val" id="s-118" style="color:var(--cyan)">—</div></div>
-      <div class="stat"><div class="label">closest coin</div><div class="val" id="s-best" style="font-size:12px">—</div></div>
+      <div class="stat" id="sc-total" onclick="statFilter('all')"><div class="label">coins scanned</div><div class="val" id="s-total">—</div></div>
+      <div class="stat clickable" id="sc-near" onclick="statFilter('near-any')" title="Click to show coins near any fib level"><div class="label">near any fib ↗</div><div class="val green" id="s-near">—</div></div>
+      <div class="stat clickable" id="sc-618" onclick="statFilter('0.618')" title="Click to show coins near 0.618"><div class="label">near 0.618 golden ↗</div><div class="val amber" id="s-618">—</div></div>
+      <div class="stat clickable" id="sc-118" onclick="statFilter('0.118')" title="Click to show coins near 0.118"><div class="label">near 0.118 ↗</div><div class="val" id="s-118" style="color:var(--cyan)">—</div></div>
+      <div class="stat clickable" id="sc-best" onclick="statFilter('closest')" title="Click to jump to closest coin"><div class="label">closest coin ↗</div><div class="val" id="s-best" style="font-size:12px">—</div></div>
       <div class="stat"><div class="label">avg proximity</div><div class="val" id="s-avg">—</div></div>
     </div>
 
@@ -209,11 +212,14 @@
           oninput="document.getElementById('thresh-val').textContent=parseFloat(this.value).toFixed(1)+'%';renderTable()">
         <span id="thresh-val">3.0%</span>
       </div>
+      <button class="filter-btn" id="mode-btn" onclick="toggleMode()" title="Switch fib direction">
+        ATH → ATL
+      </button>
     </div>
 
-    <div class="legend">
+    <div class="legend" id="legend-bar">
       <span class="legend-title">levels:</span>
-      <span class="legend-item"><span class="legend-dot" style="background:#8b90a0"></span>0 (ATH)</span>
+      <span class="legend-item" id="leg-0"><span class="legend-dot" style="background:#8b90a0"></span>0 (ATH)</span>
       <span class="legend-item"><span class="legend-dot" style="background:#2dd4bf"></span>0.118</span>
       <span class="legend-item"><span class="legend-dot" style="background:#4a9eff"></span>0.236</span>
       <span class="legend-item"><span class="legend-dot" style="background:#22c98a"></span>0.382</span>
@@ -221,7 +227,7 @@
       <span class="legend-item"><span class="legend-dot" style="background:#f5a623"></span>0.618 ★ golden</span>
       <span class="legend-item"><span class="legend-dot" style="background:#f472b6"></span>0.786</span>
       <span class="legend-item"><span class="legend-dot" style="background:#a78bfa"></span>0.886</span>
-      <span class="legend-item"><span class="legend-dot" style="background:#8b90a0"></span>1.0 (ATL)</span>
+      <span class="legend-item" id="leg-1"><span class="legend-dot" style="background:#8b90a0"></span>1.0 (ATL)</span>
       <span style="margin-left:auto;font-size:10px;color:var(--text3);font-family:var(--mono)">highlighted pill = within threshold · hover for exact price</span>
     </div>
 
@@ -246,8 +252,13 @@
     ];
 
     let allCoins = [], activeFilter = 'all', searchQuery = '', sortKey = 'proximity', sortDir = 1;
+    let reverseMode = false;
 
-    function fibPrice(ath, atl, level) { return ath - (ath - atl) * level; }
+    function fibPrice(ath, atl, level) {
+      return reverseMode
+        ? atl + (ath - atl) * level   // ATL → ATH: 0 = ATL, 1 = ATH
+        : ath - (ath - atl) * level;  // ATH → ATL: 0 = ATH, 1 = ATL
+    }
 
     function calcBest(price, ath, atl) {
       let best = Infinity, bestLabel = null;
@@ -271,6 +282,31 @@
     function posInRange(price, ath, atl) {
       if (ath === atl) return 1;
       return Math.max(0, Math.min(1, (price - atl) / (ath - atl)));
+    }
+
+    function recomputeProximities() {
+      allCoins.forEach(c => {
+        const { pct, label } = calcBest(c.price, c.ath, c.atl);
+        c.proximity = pct;
+        c.nearestLevel = label;
+        c.allProximities = allProx(c.price, c.ath, c.atl);
+      });
+    }
+
+    function toggleMode() {
+      reverseMode = !reverseMode;
+      const btn = document.getElementById('mode-btn');
+      btn.textContent = reverseMode ? 'ATL → ATH' : 'ATH → ATL';
+      btn.style.color = reverseMode ? 'var(--green)' : '';
+      btn.style.borderColor = reverseMode ? 'var(--green)' : '';
+      document.getElementById('logo-sub').textContent =
+        reverseMode ? 'ATL → ATH · RECOVERY FIBS · TOP 200 MCAP'
+                    : 'ATH → ATL · 8 FIB LEVELS · TOP 200 MCAP';
+      document.getElementById('leg-0').innerHTML =
+        `<span class="legend-dot" style="background:#8b90a0"></span>0 (${reverseMode ? 'ATL' : 'ATH'})`;
+      document.getElementById('leg-1').innerHTML =
+        `<span class="legend-dot" style="background:#8b90a0"></span>1.0 (${reverseMode ? 'ATH' : 'ATL'})`;
+      if (allCoins.length) { recomputeProximities(); renderTable(); }
     }
 
     function fmt(p) {
@@ -355,10 +391,49 @@
       document.getElementById('s-avg').textContent   = isNaN(avg) ? '—' : avg.toFixed(2) + '%';
     }
 
+    function clearStatActive() {
+      ['sc-near','sc-618','sc-118','sc-best'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.classList.remove('active');
+      });
+    }
+
     function setFilter(btn, f) {
       document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
+      clearStatActive();
       activeFilter = f;
+      renderTable();
+    }
+
+    function statFilter(f) {
+      clearStatActive();
+      document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+      if (f === 'near-any') {
+        activeFilter = 'near-any';
+        document.getElementById('sc-near').classList.add('active');
+      } else if (f === 'closest') {
+        // sort by proximity and show all coins
+        activeFilter = 'all';
+        sortKey = 'proximity';
+        sortDir = 1;
+        document.querySelector('.filter-btn').classList.add('active');
+        document.getElementById('sc-best').classList.add('active');
+        renderTable();
+        setTimeout(() => {
+          const rows = document.querySelectorAll('#table-wrap tbody tr');
+          if (rows[0]) rows[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 50);
+        return;
+      } else {
+        activeFilter = f;
+        const scMap = { '0.618': 'sc-618', '0.118': 'sc-118' };
+        if (scMap[f]) document.getElementById(scMap[f]).classList.add('active');
+        // also activate the matching toolbar fib button
+        document.querySelectorAll('.filter-btn').forEach(b => {
+          if (b.textContent.trim().startsWith(f)) b.classList.add('active');
+        });
+      }
       renderTable();
     }
 
@@ -384,9 +459,10 @@
       }
 
       // Fib / rank filter
-      if      (activeFilter === 'top10')  coins = coins.filter(c => c.rank <= 10);
-      else if (activeFilter === 'top50')  coins = coins.filter(c => c.rank <= 50);
-      else if (activeFilter === 'top100') coins = coins.filter(c => c.rank <= 100);
+      if      (activeFilter === 'top10')    coins = coins.filter(c => c.rank <= 10);
+      else if (activeFilter === 'top50')    coins = coins.filter(c => c.rank <= 50);
+      else if (activeFilter === 'top100')   coins = coins.filter(c => c.rank <= 100);
+      else if (activeFilter === 'near-any') coins = coins.filter(c => c.proximity <= thresh);
       else if (activeFilter !== 'all') {
         coins = coins.filter(c => {
           const m = c.allProximities.find(p => p.label === activeFilter);
@@ -419,9 +495,9 @@
           <th onclick="setSort('symbol')" style="width:130px">coin${ar('symbol')}</th>
           ${sh('price','price')}
           ${sh('change24h','24h')}
-          ${sh('drawdown','dd from ath')}
+          ${sh('drawdown', reverseMode ? 'gain from atl' : 'dd from ath')}
           ${sh('proximity','nearest fib')}
-          <th>fib levels (ath → atl)</th>
+          <th>fib levels (${reverseMode ? 'atl → ath' : 'ath → atl'})</th>
           <th style="min-width:150px">retracement bar</th>
           ${sh('ath','ath')}
           ${sh('atl','atl')}
@@ -430,7 +506,10 @@
       for (const c of coins) {
         const chgColor = c.change24h >= 0 ? 'var(--green)' : 'var(--red)';
         const chgStr   = (c.change24h >= 0 ? '+' : '') + c.change24h.toFixed(2) + '%';
-        const ddColor  = c.drawdown > 80 ? 'var(--red)' : c.drawdown > 50 ? 'var(--amber)' : 'var(--text2)';
+        const gainFromAtl = c.atl > 0 ? (c.price - c.atl) / c.atl * 100 : 0;
+        const ddColor  = reverseMode
+          ? (gainFromAtl > 100 ? 'var(--green)' : gainFromAtl > 30 ? 'var(--amber)' : 'var(--text2)')
+          : (c.drawdown > 80 ? 'var(--red)' : c.drawdown > 50 ? 'var(--amber)' : 'var(--text2)');
 
         const badgeCls = c.proximity <= 1 ? 'badge-green' : c.proximity <= 3 ? 'badge-amber' : c.proximity <= 6 ? 'badge-blue' : 'badge-red';
 
@@ -459,7 +538,7 @@
           <td><div class="sym">${symHtml}</div><div class="name-text">${nameHtml}</div></td>
           <td style="font-variant-numeric:tabular-nums">${fmt(c.price)}</td>
           <td style="color:${chgColor};font-variant-numeric:tabular-nums">${chgStr}</td>
-          <td style="color:${ddColor}">-${c.drawdown.toFixed(1)}%</td>
+          <td style="color:${ddColor}">${reverseMode ? '+' + gainFromAtl.toFixed(1) + '%' : '-' + c.drawdown.toFixed(1) + '%'}</td>
           <td><span class="badge ${badgeCls}">${c.proximity.toFixed(2)}% → ${c.nearestLevel}</span></td>
           <td><div class="fib-cells">${fibCells}</div></td>
           <td>
