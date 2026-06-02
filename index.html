@@ -41,7 +41,10 @@
     main { max-width: 1600px; margin: 0 auto; padding: 1.5rem; }
 
     .stat-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 1.25rem; }
-    .stat { background: var(--bg2); border: 0.5px solid var(--border); border-radius: var(--radius-lg); padding: 1rem 1.125rem; }
+    .stat { background: var(--bg2); border: 0.5px solid var(--border); border-radius: var(--radius-lg); padding: 1rem 1.125rem; transition: border-color 0.15s, background 0.15s; }
+    .stat.clickable { cursor: pointer; }
+    .stat.clickable:hover { background: var(--bg3); border-color: var(--border2); }
+    .stat.clickable.active { border-color: rgba(34,201,138,0.35); background: var(--green-bg); }
     .stat .label { font-size: 10px; color: var(--text3); font-family: var(--mono); letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 5px; }
     .stat .val { font-size: 20px; font-weight: 500; font-family: var(--mono); }
     .stat .val.green { color: var(--green); }
@@ -169,11 +172,11 @@
 
   <main>
     <div class="stat-row">
-      <div class="stat"><div class="label">coins scanned</div><div class="val" id="s-total">—</div></div>
-      <div class="stat"><div class="label">near any fib</div><div class="val green" id="s-near">—</div></div>
-      <div class="stat"><div class="label">near 0.618 golden</div><div class="val amber" id="s-618">—</div></div>
-      <div class="stat"><div class="label">near 0.118</div><div class="val" id="s-118" style="color:var(--cyan)">—</div></div>
-      <div class="stat"><div class="label">closest coin</div><div class="val" id="s-best" style="font-size:12px">—</div></div>
+      <div class="stat" id="sc-total" onclick="statFilter('all')"><div class="label">coins scanned</div><div class="val" id="s-total">—</div></div>
+      <div class="stat clickable" id="sc-near" onclick="statFilter('near-any')" title="Click to show coins near any fib level"><div class="label">near any fib ↗</div><div class="val green" id="s-near">—</div></div>
+      <div class="stat clickable" id="sc-618" onclick="statFilter('0.618')" title="Click to show coins near 0.618"><div class="label">near 0.618 golden ↗</div><div class="val amber" id="s-618">—</div></div>
+      <div class="stat clickable" id="sc-118" onclick="statFilter('0.118')" title="Click to show coins near 0.118"><div class="label">near 0.118 ↗</div><div class="val" id="s-118" style="color:var(--cyan)">—</div></div>
+      <div class="stat clickable" id="sc-best" onclick="statFilter('closest')" title="Click to jump to closest coin"><div class="label">closest coin ↗</div><div class="val" id="s-best" style="font-size:12px">—</div></div>
       <div class="stat"><div class="label">avg proximity</div><div class="val" id="s-avg">—</div></div>
     </div>
 
@@ -388,10 +391,49 @@
       document.getElementById('s-avg').textContent   = isNaN(avg) ? '—' : avg.toFixed(2) + '%';
     }
 
+    function clearStatActive() {
+      ['sc-near','sc-618','sc-118','sc-best'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.classList.remove('active');
+      });
+    }
+
     function setFilter(btn, f) {
       document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
+      clearStatActive();
       activeFilter = f;
+      renderTable();
+    }
+
+    function statFilter(f) {
+      clearStatActive();
+      document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+      if (f === 'near-any') {
+        activeFilter = 'near-any';
+        document.getElementById('sc-near').classList.add('active');
+      } else if (f === 'closest') {
+        // sort by proximity and show all coins
+        activeFilter = 'all';
+        sortKey = 'proximity';
+        sortDir = 1;
+        document.querySelector('.filter-btn').classList.add('active');
+        document.getElementById('sc-best').classList.add('active');
+        renderTable();
+        setTimeout(() => {
+          const rows = document.querySelectorAll('#table-wrap tbody tr');
+          if (rows[0]) rows[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 50);
+        return;
+      } else {
+        activeFilter = f;
+        const scMap = { '0.618': 'sc-618', '0.118': 'sc-118' };
+        if (scMap[f]) document.getElementById(scMap[f]).classList.add('active');
+        // also activate the matching toolbar fib button
+        document.querySelectorAll('.filter-btn').forEach(b => {
+          if (b.textContent.trim().startsWith(f)) b.classList.add('active');
+        });
+      }
       renderTable();
     }
 
@@ -417,9 +459,10 @@
       }
 
       // Fib / rank filter
-      if      (activeFilter === 'top10')  coins = coins.filter(c => c.rank <= 10);
-      else if (activeFilter === 'top50')  coins = coins.filter(c => c.rank <= 50);
-      else if (activeFilter === 'top100') coins = coins.filter(c => c.rank <= 100);
+      if      (activeFilter === 'top10')    coins = coins.filter(c => c.rank <= 10);
+      else if (activeFilter === 'top50')    coins = coins.filter(c => c.rank <= 50);
+      else if (activeFilter === 'top100')   coins = coins.filter(c => c.rank <= 100);
+      else if (activeFilter === 'near-any') coins = coins.filter(c => c.proximity <= thresh);
       else if (activeFilter !== 'all') {
         coins = coins.filter(c => {
           const m = c.allProximities.find(p => p.label === activeFilter);
