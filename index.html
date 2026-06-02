@@ -159,7 +159,7 @@
       <div class="logo-icon"><i class="ti ti-wave-sine" aria-hidden="true"></i></div>
       <div>
         <div class="logo-text">CRYPTO <span>FIB</span> SCANNER</div>
-        <div class="logo-sub" id="logo-sub">ATH → ATL · 8 FIB LEVELS · TOP 200 MCAP</div>
+        <div class="logo-sub" id="logo-sub">ATH → ATL · 8 FIB LEVELS · TOP 200 VOLUME · BINANCE</div>
       </div>
     </div>
     <div class="header-right">
@@ -300,8 +300,8 @@
       btn.style.color = reverseMode ? 'var(--green)' : '';
       btn.style.borderColor = reverseMode ? 'var(--green)' : '';
       document.getElementById('logo-sub').textContent =
-        reverseMode ? 'ATL → ATH · RECOVERY FIBS · TOP 200 MCAP'
-                    : 'ATH → ATL · 8 FIB LEVELS · TOP 200 MCAP';
+        reverseMode ? 'ATL → ATH · RECOVERY FIBS · TOP 200 VOLUME'
+                    : 'ATH → ATL · 8 FIB LEVELS · TOP 200 VOLUME';
       document.getElementById('leg-0').innerHTML =
         `<span class="legend-dot" style="background:#8b90a0"></span>0 (${reverseMode ? 'ATL' : 'ATH'})`;
       document.getElementById('leg-1').innerHTML =
@@ -336,35 +336,84 @@
       onSearch('');
     }
 
-    async function loadData() {
+    function setLoadMsg(msg) {
       document.getElementById('table-wrap').innerHTML =
-        '<div class="load-msg"><i class="ti ti-loader spin" aria-hidden="true"></i>fetching top 200 coins from CoinGecko…</div>';
+        `<div class="load-msg"><i class="ti ti-loader spin" aria-hidden="true"></i>${msg}</div>`;
+    }
+
+    const STABLE_COINS = new Set([
+      'USDT','BUSD','USDC','DAI','TUSD','FDUSD','USDP','GUSD','FRAX',
+      'LUSD','SUSD','ALUSD','MUSD','USTC','USDD','CRVUSD','PYUSD'
+    ]);
+
+    async function loadData() {
       const btn = document.getElementById('rescan-btn');
       btn.disabled = true;
+      setLoadMsg('fetching Binance ticker data…');
 
       try {
-        const raw = (await Promise.all(
-          [1,2,3,4].map(p =>
-            fetch(`https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=50&page=${p}&sparkline=false`)
-              .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status} — rate limited, wait 60s`); return r.json(); })
-          )
-        )).flat().filter(c => c && c.current_price && c.ath && c.atl && c.ath > c.atl);
+        // Step 1: All 24hr tickers → filter USDT pairs → rank by quote volume → top 200
+        const tickers = await fetch('https://api.binance.com/api/v3/ticker/24hr')
+          .then(r => { if (!r.ok) throw new Error(`Binance API error ${r.status}`); return r.json(); });
 
-        allCoins = raw.map((c, i) => {
-          const price = c.current_price, ath = c.ath, atl = c.atl;
-          const { pct, label } = calcBest(price, ath, atl);
-          return {
-            rank: i + 1, id: c.id,
-            symbol: c.symbol.toUpperCase(), name: c.name,
-            price, ath, atl,
-            change24h: c.price_change_percentage_24h || 0,
-            mcap: c.market_cap,
-            proximity: pct, nearestLevel: label,
-            allProximities: allProx(price, ath, atl),
-            posInRange: posInRange(price, ath, atl),
-            drawdown: (ath - price) / ath * 100,
-          };
-        });
+        const top200 = tickers
+          .filter(t => {
+            const base = t.symbol.slice(0, -4); // strip USDT suffix
+            return t.symbol.endsWith('USDT')
+              && !STABLE_COINS.has(base)
+              && parseFloat(t.lastPrice) > 0
+              && parseFloat(t.quoteVolume) > 0;
+          })
+          .sort((a, b) => parseFloat(b.quoteVolume) - parseFloat(a.quoteVolume))
+          .slice(0, 200);
+
+        // Step 2: Fetch weekly klines for ATH/ATL in batches of 20
+        const BATCH = 20;
+        const klineResults = [];
+        for (let i = 0; i < top200.length; i += BATCH) {
+          setLoadMsg(`calculating ATH/ATL from kline history… ${i}/${top200.length}`);
+          const batch = top200.slice(i, i + BATCH);
+          const batchData = await Promise.all(
+            batch.map(t =>
+              fetch(`https://api.binance.com/api/v3/klines?symbol=${t.symbol}&interval=1w&limit=1000`)
+                .then(r => r.json())
+                .catch(() => [])
+            )
+          );
+          batchData.forEach((klines, j) => klineResults.push({ ticker: batch[j], klines }));
+        }
+
+        // Step 3: Build coin objects
+        allCoins = klineResults
+          .map(({ ticker, klines }, i) => {
+            const price = parseFloat(ticker.lastPrice);
+            if (!klines.length || !price) return null;
+
+            // kline format: [openTime, open, high, low, close, ...]
+            const highs = klines.map(k => parseFloat(k[2]));
+            const lows  = klines.map(k => parseFloat(k[3])).filter(v => v > 0);
+            const ath   = Math.max(...highs);
+            const atl   = Math.min(...lows);
+
+            if (!ath || !atl || ath <= atl || price <= 0) return null;
+
+            const symbol = ticker.symbol.slice(0, -4);
+            const { pct, label } = calcBest(price, ath, atl);
+            return {
+              rank: i + 1, id: ticker.symbol,
+              symbol, name: symbol,
+              price, ath, atl,
+              change24h: parseFloat(ticker.priceChangePercent) || 0,
+              volume: parseFloat(ticker.quoteVolume),
+              proximity: pct, nearestLevel: label,
+              allProximities: allProx(price, ath, atl),
+              posInRange: posInRange(price, ath, atl),
+              drawdown: (ath - price) / ath * 100,
+            };
+          })
+          .filter(Boolean);
+
+        allCoins.forEach((c, i) => c.rank = i + 1);
 
         document.getElementById('last-updated').textContent = 'updated ' + new Date().toLocaleTimeString();
         updateStats();
