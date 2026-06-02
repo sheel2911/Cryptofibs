@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Crypto Fib Scanner — ATH/ATL</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0d0f14; --bg2: #13161e; --bg3: #1a1d27;
+      --border: rgba(255,255,255,0.08); --border2: rgba(255,255,255,0.14);
+      --text: #e8eaf0; --text2: #8b90a0; --text3: #555a6b;
+      --green: #22c98a; --green-bg: rgba(34,201,138,0.12);
+      --red: #f04a5a; --red-bg: rgba(240,74,90,0.12);
+      --amber: #f5a623; --amber-bg: rgba(245,166,35,0.12);
+      --blue: #4a9eff; --blue-bg: rgba(74,158,255,0.12);
+      --pink: #f472b6; --pink-bg: rgba(244,114,182,0.12);
+      --cyan: #2dd4bf; --cyan-bg: rgba(45,212,191,0.12);
+      --mono: 'JetBrains Mono', monospace; --sans: 'Inter', sans-serif;
+      --radius: 8px; --radius-lg: 12px;
+    }
+    body { background: var(--bg); color: var(--text); font-family: var(--sans); min-height: 100vh; }
+
+    header {
+      background: var(--bg2); border-bottom: 0.5px solid var(--border);
+      padding: 1rem 1.5rem; display: flex; align-items: center;
+      justify-content: space-between; flex-wrap: wrap; gap: 10px;
+      position: sticky; top: 0; z-index: 10;
+    }
+    .logo { display: flex; align-items: center; gap: 10px; }
+    .logo-icon { width: 32px; height: 32px; background: var(--green-bg); border-radius: 8px; display: flex; align-items: center; justify-content: center; color: var(--green); font-size: 18px; }
+    .logo-text { font-family: var(--mono); font-size: 15px; font-weight: 500; letter-spacing: -0.3px; }
+    .logo-text span { color: var(--green); }
+    .logo-sub { font-family: var(--mono); font-size: 10px; color: var(--text3); letter-spacing: 0.5px; margin-top: 2px; }
+    .header-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .header-meta { font-family: var(--mono); font-size: 11px; color: var(--text3); }
+
+    main { max-width: 1600px; margin: 0 auto; padding: 1.5rem; }
+
+    .stat-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 1.25rem; }
+    .stat { background: var(--bg2); border: 0.5px solid var(--border); border-radius: var(--radius-lg); padding: 1rem 1.125rem; }
+    .stat .label { font-size: 10px; color: var(--text3); font-family: var(--mono); letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 5px; }
+    .stat .val { font-size: 20px; font-weight: 500; font-family: var(--mono); }
+    .stat .val.green { color: var(--green); }
+    .stat .val.amber { color: var(--amber); }
+
+    .toolbar {
+      background: var(--bg2); border: 0.5px solid var(--border); border-radius: var(--radius-lg);
+      padding: 0.875rem 1rem; margin-bottom: 0.75rem;
+      display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+    }
+    .filter-group { display: flex; gap: 5px; flex-wrap: wrap; align-items: center; }
+    .filter-label { font-size: 10px; color: var(--text3); font-family: var(--mono); letter-spacing: 0.4px; text-transform: uppercase; margin-right: 4px; white-space: nowrap; }
+    .filter-btn {
+      font-size: 11px; font-family: var(--mono); padding: 4px 10px;
+      border-radius: 20px; border: 0.5px solid var(--border2);
+      background: transparent; color: var(--text2); cursor: pointer; transition: all 0.15s;
+    }
+    .filter-btn:hover { background: var(--bg3); color: var(--text); }
+    .filter-btn.active { background: var(--green-bg); color: var(--green); border-color: rgba(34,201,138,0.3); }
+
+    .search-wrap {
+      display: flex; align-items: center; gap: 8px;
+      background: var(--bg3); border: 0.5px solid var(--border2);
+      border-radius: var(--radius); padding: 5px 10px;
+      min-width: 200px; flex: 1; max-width: 280px;
+    }
+    .search-wrap i { color: var(--text3); font-size: 14px; flex-shrink: 0; }
+    .search-wrap input {
+      background: transparent; border: none; outline: none;
+      color: var(--text); font-family: var(--mono); font-size: 12px;
+      width: 100%; caret-color: var(--green);
+    }
+    .search-wrap input::placeholder { color: var(--text3); }
+    .search-clear { color: var(--text3); font-size: 12px; cursor: pointer; flex-shrink: 0; display: none; }
+    .search-clear:hover { color: var(--text2); }
+
+    .thresh-wrap { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+    .thresh-wrap label { font-size: 10px; color: var(--text3); font-family: var(--mono); white-space: nowrap; text-transform: uppercase; letter-spacing: 0.4px; }
+    input[type=range] { -webkit-appearance: none; appearance: none; width: 90px; height: 4px; border-radius: 2px; background: var(--border2); outline: none; cursor: pointer; }
+    input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%; background: var(--green); cursor: pointer; }
+    #thresh-val { font-size: 11px; font-family: var(--mono); color: var(--green); min-width: 32px; }
+
+    .scan-btn {
+      font-size: 12px; font-family: var(--mono); padding: 6px 14px;
+      border-radius: var(--radius); border: 0.5px solid rgba(34,201,138,0.3);
+      background: var(--green-bg); color: var(--green); cursor: pointer;
+      display: flex; align-items: center; gap: 6px; transition: all 0.15s;
+    }
+    .scan-btn:hover { background: rgba(34,201,138,0.2); }
+    .scan-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .legend {
+      display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 1rem;
+      background: var(--bg2); border: 0.5px solid var(--border);
+      border-radius: var(--radius-lg); padding: 0.75rem 1rem; align-items: center;
+    }
+    .legend-title { font-size: 10px; color: var(--text3); font-family: var(--mono); text-transform: uppercase; letter-spacing: 0.4px; margin-right: 4px; }
+    .legend-item { display: flex; align-items: center; gap: 5px; font-size: 10px; font-family: var(--mono); color: var(--text2); }
+    .legend-dot { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
+
+    .results-count { font-size: 11px; color: var(--text3); font-family: var(--mono); margin-bottom: 0.5rem; padding: 0 2px; }
+    .results-count span { color: var(--green); }
+
+    .table-wrap { overflow-x: auto; border-radius: var(--radius-lg); border: 0.5px solid var(--border); }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; font-family: var(--mono); }
+    thead { background: var(--bg2); }
+    th {
+      font-size: 10px; font-weight: 500; color: var(--text3);
+      padding: 10px 10px; text-align: left;
+      border-bottom: 0.5px solid var(--border);
+      cursor: pointer; user-select: none; white-space: nowrap;
+      letter-spacing: 0.4px; text-transform: uppercase;
+    }
+    th:hover { color: var(--text2); }
+    td { padding: 8px 10px; border-bottom: 0.5px solid var(--border); vertical-align: middle; background: var(--bg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: var(--bg2); }
+
+    .sym { font-weight: 500; color: var(--text); font-size: 13px; }
+    .name-text { font-size: 10px; color: var(--text3); }
+    .rank-num { font-size: 10px; color: var(--text3); }
+
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 10px; font-weight: 500; white-space: nowrap; }
+    .badge-green { background: var(--green-bg); color: var(--green); }
+    .badge-amber { background: var(--amber-bg); color: var(--amber); }
+    .badge-red   { background: var(--red-bg);   color: var(--red);   }
+    .badge-blue  { background: var(--blue-bg);  color: var(--blue);  }
+
+    .fib-cells { display: flex; gap: 3px; flex-wrap: nowrap; }
+    .fc { font-size: 10px; padding: 2px 5px; border-radius: 4px; font-family: var(--mono); white-space: nowrap; cursor: default; }
+
+    .pos-bar-wrap { display: flex; align-items: center; gap: 5px; min-width: 130px; }
+    .pos-bar-bg { flex: 1; height: 5px; background: var(--border); border-radius: 2px; position: relative; }
+    .pos-bar-fill { height: 100%; border-radius: 2px; }
+    .pos-label { font-size: 9px; color: var(--text3); min-width: 22px; }
+
+    .load-msg { text-align: center; padding: 5rem 2rem; color: var(--text3); font-family: var(--mono); font-size: 13px; }
+    .load-msg i { font-size: 28px; display: block; margin-bottom: 12px; color: var(--green); }
+    .err { text-align: center; padding: 3rem 2rem; color: var(--red); font-family: var(--mono); font-size: 12px; line-height: 1.8; }
+
+    .spin { animation: spin 1s linear infinite; display: inline-block; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .highlight { background: rgba(34,201,138,0.2); color: var(--green); border-radius: 2px; padding: 0 1px; }
+
+    @media (max-width: 768px) { main { padding: 0.75rem; } .search-wrap { max-width: 100%; } }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="logo">
+      <div class="logo-icon"><i class="ti ti-wave-sine" aria-hidden="true"></i></div>
+      <div>
+        <div class="logo-text">CRYPTO <span>FIB</span> SCANNER</div>
+        <div class="logo-sub">ATH → ATL · 8 FIB LEVELS · TOP 200 MCAP</div>
+      </div>
+    </div>
+    <div class="header-right">
+      <span class="header-meta" id="last-updated">not yet scanned</span>
+      <button class="scan-btn" id="rescan-btn" onclick="loadData()">
+        <i class="ti ti-refresh" aria-hidden="true"></i> rescan
+      </button>
+    </div>
+  </header>
+
+  <main>
+    <div class="stat-row">
+      <div class="stat"><div class="label">coins scanned</div><div class="val" id="s-total">—</div></div>
+      <div class="stat"><div class="label">near any fib</div><div class="val green" id="s-near">—</div></div>
+      <div class="stat"><div class="label">near 0.618 golden</div><div class="val amber" id="s-618">—</div></div>
+      <div class="stat"><div class="label">near 0.118</div><div class="val" id="s-118" style="color:var(--cyan)">—</div></div>
+      <div class="stat"><div class="label">closest coin</div><div class="val" id="s-best" style="font-size:12px">—</div></div>
+      <div class="stat"><div class="label">avg proximity</div><div class="val" id="s-avg">—</div></div>
+    </div>
+
+    <div class="toolbar">
+      <div class="filter-group">
+        <span class="filter-label">fib:</span>
+        <button class="filter-btn active" onclick="setFilter(this,'all')">all</button>
+        <button class="filter-btn" onclick="setFilter(this,'0.118')">0.118</button>
+        <button class="filter-btn" onclick="setFilter(this,'0.236')">0.236</button>
+        <button class="filter-btn" onclick="setFilter(this,'0.382')">0.382</button>
+        <button class="filter-btn" onclick="setFilter(this,'0.5')">0.5</button>
+        <button class="filter-btn" onclick="setFilter(this,'0.618')">0.618 ★</button>
+        <button class="filter-btn" onclick="setFilter(this,'0.786')">0.786</button>
+        <button class="filter-btn" onclick="setFilter(this,'0.886')">0.886</button>
+      </div>
+      <div class="filter-group">
+        <span class="filter-label">rank:</span>
+        <button class="filter-btn" onclick="setFilter(this,'top10')">top 10</button>
+        <button class="filter-btn" onclick="setFilter(this,'top50')">top 50</button>
+        <button class="filter-btn" onclick="setFilter(this,'top100')">top 100</button>
+      </div>
+
+      <div class="search-wrap">
+        <i class="ti ti-search" aria-hidden="true"></i>
+        <input type="text" id="search-input" placeholder="search coin or symbol…"
+          oninput="onSearch(this.value)" autocomplete="off" spellcheck="false">
+        <span class="search-clear" id="search-clear" onclick="clearSearch()">✕</span>
+      </div>
+
+      <div class="thresh-wrap">
+        <label>proximity:</label>
+        <input type="range" min="0.5" max="10" step="0.5" value="3" id="thresh-slider"
+          oninput="document.getElementById('thresh-val').textContent=parseFloat(this.value).toFixed(1)+'%';renderTable()">
+        <span id="thresh-val">3.0%</span>
+      </div>
+    </div>
+
+    <div class="legend">
+      <span class="legend-title">levels:</span>
+      <span class="legend-item"><span class="legend-dot" style="background:#8b90a0"></span>0 (ATH)</span>
+      <span class="legend-item"><span class="legend-dot" style="background:#2dd4bf"></span>0.118</span>
+      <span class="legend-item"><span class="legend-dot" style="background:#4a9eff"></span>0.236</span>
+      <span class="legend-item"><span class="legend-dot" style="background:#22c98a"></span>0.382</span>
+      <span class="legend-item"><span class="legend-dot" style="background:#f04a5a"></span>0.5</span>
+      <span class="legend-item"><span class="legend-dot" style="background:#f5a623"></span>0.618 ★ golden</span>
+      <span class="legend-item"><span class="legend-dot" style="background:#f472b6"></span>0.786</span>
+      <span class="legend-item"><span class="legend-dot" style="background:#a78bfa"></span>0.886</span>
+      <span class="legend-item"><span class="legend-dot" style="background:#8b90a0"></span>1.0 (ATL)</span>
+      <span style="margin-left:auto;font-size:10px;color:var(--text3);font-family:var(--mono)">highlighted pill = within threshold · hover for exact price</span>
+    </div>
+
+    <div class="results-count" id="results-count"></div>
+
+    <div class="table-wrap" id="table-wrap">
+      <div class="load-msg">
+        <i class="ti ti-loader spin" aria-hidden="true"></i>
+        fetching top 200 coins…
+      </div>
+    </div>
+  </main>
+
+  <script>
+    const FIB_LEVELS = [0, 0.118, 0.236, 0.382, 0.5, 0.618, 0.786, 0.886, 1];
+    const FIB_LABELS = ['0','0.118','0.236','0.382','0.5','0.618','0.786','0.886','1'];
+    const FIB_COLORS = ['#8b90a0','#2dd4bf','#4a9eff','#22c98a','#f04a5a','#f5a623','#f472b6','#a78bfa','#8b90a0'];
+    const FIB_BG     = [
+      'rgba(139,144,160,0.15)','rgba(45,212,191,0.15)','rgba(74,158,255,0.15)',
+      'rgba(34,201,138,0.15)','rgba(240,74,90,0.15)','rgba(245,166,35,0.15)',
+      'rgba(244,114,182,0.15)','rgba(167,139,250,0.15)','rgba(139,144,160,0.15)'
+    ];
+
+    let allCoins = [], activeFilter = 'all', searchQuery = '', sortKey = 'proximity', sortDir = 1;
+
+    function fibPrice(ath, atl, level) { return ath - (ath - atl) * level; }
+
+    function calcBest(price, ath, atl) {
+      let best = Infinity, bestLabel = null;
+      FIB_LEVELS.forEach((lvl, i) => {
+        const fp = fibPrice(ath, atl, lvl);
+        if (fp <= 0) return;
+        const pct = Math.abs(price - fp) / fp * 100;
+        if (pct < best) { best = pct; bestLabel = FIB_LABELS[i]; }
+      });
+      return { pct: best, label: bestLabel };
+    }
+
+    function allProx(price, ath, atl) {
+      return FIB_LEVELS.map((lvl, i) => {
+        const fp = fibPrice(ath, atl, lvl);
+        const pct = fp > 0 ? Math.abs(price - fp) / fp * 100 : 999;
+        return { label: FIB_LABELS[i], fp, pct, color: FIB_COLORS[i], bg: FIB_BG[i] };
+      });
+    }
+
+    function posInRange(price, ath, atl) {
+      if (ath === atl) return 1;
+      return Math.max(0, Math.min(1, (price - atl) / (ath - atl)));
+    }
+
+    function fmt(p) {
+      if (p >= 1000) return '$' + p.toLocaleString('en', { maximumFractionDigits: 0 });
+      if (p >= 1)    return '$' + p.toFixed(2);
+      if (p >= 0.01) return '$' + p.toFixed(4);
+      return '$' + p.toPrecision(3);
+    }
+
+    function highlightMatch(text, query) {
+      if (!query) return text;
+      const idx = text.toLowerCase().indexOf(query.toLowerCase());
+      if (idx === -1) return text;
+      return text.slice(0, idx) +
+        `<span class="highlight">${text.slice(idx, idx + query.length)}</span>` +
+        text.slice(idx + query.length);
+    }
+
+    function onSearch(val) {
+      searchQuery = val.trim();
+      document.getElementById('search-clear').style.display = searchQuery ? 'block' : 'none';
+      renderTable();
+    }
+
+    function clearSearch() {
+      document.getElementById('search-input').value = '';
+      onSearch('');
+    }
+
+    async function loadData() {
+      document.getElementById('table-wrap').innerHTML =
+        '<div class="load-msg"><i class="ti ti-loader spin" aria-hidden="true"></i>fetching top 200 coins from CoinGecko…</div>';
+      const btn = document.getElementById('rescan-btn');
+      btn.disabled = true;
+
+      try {
+        const raw = (await Promise.all(
+          [1,2,3,4].map(p =>
+            fetch(`https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=50&page=${p}&sparkline=false`)
+              .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status} — rate limited, wait 60s`); return r.json(); })
+          )
+        )).flat().filter(c => c && c.current_price && c.ath && c.atl && c.ath > c.atl);
+
+        allCoins = raw.map((c, i) => {
+          const price = c.current_price, ath = c.ath, atl = c.atl;
+          const { pct, label } = calcBest(price, ath, atl);
+          return {
+            rank: i + 1, id: c.id,
+            symbol: c.symbol.toUpperCase(), name: c.name,
+            price, ath, atl,
+            change24h: c.price_change_percentage_24h || 0,
+            mcap: c.market_cap,
+            proximity: pct, nearestLevel: label,
+            allProximities: allProx(price, ath, atl),
+            posInRange: posInRange(price, ath, atl),
+            drawdown: (ath - price) / ath * 100,
+          };
+        });
+
+        document.getElementById('last-updated').textContent = 'updated ' + new Date().toLocaleTimeString();
+        updateStats();
+        renderTable();
+      } catch(e) {
+        document.getElementById('table-wrap').innerHTML =
+          `<div class="err"><i class="ti ti-alert-circle" style="font-size:24px;display:block;margin-bottom:10px"></i>${e.message}</div>`;
+      }
+      btn.disabled = false;
+    }
+
+    function updateStats() {
+      const thresh = parseFloat(document.getElementById('thresh-slider').value);
+      const near   = allCoins.filter(c => c.proximity <= thresh).length;
+      const near618 = allCoins.filter(c => { const m = c.allProximities.find(p => p.label==='0.618'); return m && m.pct<=thresh; }).length;
+      const near118 = allCoins.filter(c => { const m = c.allProximities.find(p => p.label==='0.118'); return m && m.pct<=thresh; }).length;
+      const best = [...allCoins].sort((a,b) => a.proximity - b.proximity)[0];
+      const avg  = allCoins.reduce((s,c) => s + c.proximity, 0) / allCoins.length;
+      document.getElementById('s-total').textContent = allCoins.length;
+      document.getElementById('s-near').textContent  = near;
+      document.getElementById('s-618').textContent   = near618;
+      document.getElementById('s-118').textContent   = near118;
+      document.getElementById('s-best').textContent  = best ? `${best.symbol} ${best.proximity.toFixed(2)}% → ${best.nearestLevel}` : '—';
+      document.getElementById('s-avg').textContent   = isNaN(avg) ? '—' : avg.toFixed(2) + '%';
+    }
+
+    function setFilter(btn, f) {
+      document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      activeFilter = f;
+      renderTable();
+    }
+
+    function setSort(key) {
+      sortDir = sortKey === key ? sortDir * -1 : 1;
+      sortKey = key;
+      renderTable();
+    }
+
+    function renderTable() {
+      const thresh = parseFloat(document.getElementById('thresh-slider').value);
+      updateStats();
+
+      let coins = [...allCoins];
+
+      // Search filter
+      if (searchQuery) {
+        const q = searchQuery.toLowerCase();
+        coins = coins.filter(c =>
+          c.symbol.toLowerCase().includes(q) ||
+          c.name.toLowerCase().includes(q)
+        );
+      }
+
+      // Fib / rank filter
+      if      (activeFilter === 'top10')  coins = coins.filter(c => c.rank <= 10);
+      else if (activeFilter === 'top50')  coins = coins.filter(c => c.rank <= 50);
+      else if (activeFilter === 'top100') coins = coins.filter(c => c.rank <= 100);
+      else if (activeFilter !== 'all') {
+        coins = coins.filter(c => {
+          const m = c.allProximities.find(p => p.label === activeFilter);
+          return m && m.pct <= thresh;
+        });
+      }
+
+      coins.sort((a, b) => {
+        const av = a[sortKey], bv = b[sortKey];
+        if (typeof av === 'string') return sortDir * av.localeCompare(bv);
+        return sortDir * (av - bv);
+      });
+
+      // Results count
+      const countEl = document.getElementById('results-count');
+      if (searchQuery || activeFilter !== 'all') {
+        countEl.innerHTML = `showing <span>${coins.length}</span> of ${allCoins.length} coins` +
+          (searchQuery ? ` matching "<span>${searchQuery}</span>"` : '') +
+          (activeFilter !== 'all' ? ` · filter: <span>${activeFilter}</span>` : '');
+      } else {
+        countEl.innerHTML = `showing <span>${coins.length}</span> coins`;
+      }
+
+      const ar = k => sortKey === k ? (sortDir === 1 ? ' ↑' : ' ↓') : '';
+      const sh = (k, lbl) => `<th onclick="setSort('${k}')">${lbl}${ar(k)}</th>`;
+
+      let html = `<table>
+        <thead><tr>
+          <th onclick="setSort('rank')" style="width:36px">#${ar('rank')}</th>
+          <th onclick="setSort('symbol')" style="width:130px">coin${ar('symbol')}</th>
+          ${sh('price','price')}
+          ${sh('change24h','24h')}
+          ${sh('drawdown','dd from ath')}
+          ${sh('proximity','nearest fib')}
+          <th>fib levels (ath → atl)</th>
+          <th style="min-width:150px">retracement bar</th>
+          ${sh('ath','ath')}
+          ${sh('atl','atl')}
+        </tr></thead><tbody>`;
+
+      for (const c of coins) {
+        const chgColor = c.change24h >= 0 ? 'var(--green)' : 'var(--red)';
+        const chgStr   = (c.change24h >= 0 ? '+' : '') + c.change24h.toFixed(2) + '%';
+        const ddColor  = c.drawdown > 80 ? 'var(--red)' : c.drawdown > 50 ? 'var(--amber)' : 'var(--text2)';
+
+        const badgeCls = c.proximity <= 1 ? 'badge-green' : c.proximity <= 3 ? 'badge-amber' : c.proximity <= 6 ? 'badge-blue' : 'badge-red';
+
+        const fibCells = c.allProximities.map(p => {
+          const isBest = p.label === c.nearestLevel;
+          const isNear = p.pct <= thresh;
+          const bg  = isBest ? p.color : isNear ? p.bg : 'transparent';
+          const col = isBest ? '#0d0f14' : isNear ? p.color : 'var(--text3)';
+          const brd = !isBest && isNear ? `border:1px solid ${p.color}` : 'border:1px solid transparent';
+          return `<span class="fc" style="background:${bg};color:${col};${brd}" title="${p.label} = ${fmt(p.fp)} · ${p.pct.toFixed(2)}% away">${p.label}</span>`;
+        }).join('');
+
+        const pos    = c.posInRange;
+        const barCol = pos > 0.6 ? 'var(--green)' : pos > 0.35 ? 'var(--amber)' : 'var(--red)';
+        const ticks  = [0.118,0.236,0.382,0.5,0.618,0.786,0.886].map(l => {
+          const lp = (1 - l) * 100;
+          return `<div style="position:absolute;top:-3px;left:${lp.toFixed(1)}%;width:1px;height:11px;background:rgba(255,255,255,0.18)"></div>`;
+        }).join('');
+
+        // Highlight search match in symbol/name
+        const symHtml  = highlightMatch(c.symbol, searchQuery);
+        const nameHtml = highlightMatch(c.name, searchQuery);
+
+        html += `<tr>
+          <td><span class="rank-num">${c.rank}</span></td>
+          <td><div class="sym">${symHtml}</div><div class="name-text">${nameHtml}</div></td>
+          <td style="font-variant-numeric:tabular-nums">${fmt(c.price)}</td>
+          <td style="color:${chgColor};font-variant-numeric:tabular-nums">${chgStr}</td>
+          <td style="color:${ddColor}">-${c.drawdown.toFixed(1)}%</td>
+          <td><span class="badge ${badgeCls}">${c.proximity.toFixed(2)}% → ${c.nearestLevel}</span></td>
+          <td><div class="fib-cells">${fibCells}</div></td>
+          <td>
+            <div class="pos-bar-wrap">
+              <span class="pos-label">ATL</span>
+              <div class="pos-bar-bg">
+                <div class="pos-bar-fill" style="width:${(pos*100).toFixed(1)}%;background:${barCol}"></div>
+                ${ticks}
+              </div>
+              <span class="pos-label">ATH</span>
+            </div>
+          </td>
+          <td style="font-variant-numeric:tabular-nums;color:var(--amber)">${fmt(c.ath)}</td>
+          <td style="font-variant-numeric:tabular-nums;color:var(--red)">${fmt(c.atl)}</td>
+        </tr>`;
+      }
+
+      html += '</tbody></table>';
+      if (coins.length === 0)
+        html = `<div class="load-msg" style="padding:3rem">
+          <i class="ti ti-mood-empty" aria-hidden="true" style="font-size:24px;color:var(--text3)"></i>
+          <br>no coins match${searchQuery ? ` "${searchQuery}"` : ''} with current filters
+        </div>`;
+
+      document.getElementById('table-wrap').innerHTML = html;
+    }
+
+    loadData();
+  </script>
+</body>
+</html>
